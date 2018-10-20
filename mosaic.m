@@ -14,22 +14,11 @@ y_max = dim(2);
 image_num = dim(3);
 
 % Calculate derivatives
-mask_x = [-1,0,1;-1,0,1;-1,0,1];
-mask_y = [1,1,1;0,0,0;-1,-1,-1];
 gx = zeros(x_max,y_max,image_num);
 gy = zeros(x_max,y_max,image_num);
 for counter = 1:image_num
     [gx(:,:,counter),gy(:,:,counter)] = imgradientxy(images(:,:,counter));
 end
-
-%{
-figure(1)
-imshow(images(:,:,1));
-figure(2)
-imshow(gx(:,:,1));
-figure(3)
-imshow(gy(:,:,1));
-%}
 
 % Classification parameters
 t_magnitude = 100;
