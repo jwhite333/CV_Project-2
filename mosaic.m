@@ -1,9 +1,8 @@
-
 % Load images
-f_sigma = 2;
+f_sigma = 1.4;
 images = [];
 for image_num = 1:3
-    image_name = sprintf('DanaHallWay1/DSC_028%d.JPG',image_num);
+    image_name = sprintf('resources/DanaHallWay1/DSC_028%d.JPG',image_num);
     images = cat(3,images, imgaussfilt(imread(image_name),f_sigma));
 end
 
@@ -21,13 +20,12 @@ for counter = 1:image_num
 end
 
 % Classification parameters
-t_magnitude = 100;
-t_similarity = 100;
+t_magnitude = 1e+06;
+k = 0.04;
 
 % Classification
 corners = zeros(x_max,y_max,image_num);
-x_edges = zeros(x_max,y_max,image_num);
-y_edges = zeros(x_max,y_max,image_num);
+edges = zeros(x_max,y_max,image_num);
 for counter = 1:image_num
     for x = 2:x_max-1
         for y = 2:y_max-1
@@ -42,16 +40,51 @@ for counter = 1:image_num
                 end
             end
             % Make decision
-            D = eig(M,'matrix');
-            if D(1,1) > t_magnitude && D(2,2) > t_magnitude
-                if D(2,2) - D(1,1) < t_similarity
-                    corners(x,y,counter) = 1;
-                end
-            elseif D(1,1) > t_magnitude
-                x_edges(x,y,counter) = 1;
-            elseif D(2,2) > t_magnitude
-                y_edges(x,y,counter) = 1;
+            R = det(M)-k*(trace(M))^2;
+            if R < -t_magnitude
+                edges(x,y,counter) = abs(R);
+            elseif R > t_magnitude
+                corners(x,y,counter) = R;
             end
         end
     end
 end
+
+% Do non-max suppression on edges and corners using 7x7 filter
+for counter = 1:image_num
+    for x = 4:x_max-3
+        for y = 4:y_max-3
+            % Edges
+            e_pixel = edges(x,y,counter);
+            e_pixel_is_max = 1;
+            % Corners
+            c_pixel = corners(x,y,counter);
+            c_pixel_is_max = 1;
+            for i = -3:3
+                for j = -3:3
+                    if e_pixel < edges(x+i,y+j,counter)
+                        e_pixel_is_max = 0;
+                    end
+                    if c_pixel < corners(x+i,y+j,counter)
+                        c_pixel_is_max = 0;
+                    end
+                end
+            end
+
+            % Suppress
+            if e_pixel_is_max == 0
+                edges(x,y,counter) = 0;
+            end
+            if c_pixel_is_max == 0
+                corners(x,y,counter) = 0;
+            end
+        end
+    end
+end
+
+% Show results
+figure(1)
+imshow(corners(:,:,1));
+
+figure(2)
+imshow(edges(:,:,1));
