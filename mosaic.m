@@ -1,9 +1,11 @@
+clc;
+clear;
 % Load images
-f_sigma = 1.4;
+f_sigma = 2;
 images = [];
-for image_num = 1:3
+for image_num = 1:2
     image_name = sprintf('resources/DanaHallWay1/DSC_028%d.JPG',image_num);
-    images = cat(3,images, imgaussfilt(imread(image_name),f_sigma));
+    images = cat(3,images,rgb2gray(imread(image_name)));
 end
 
 % Get size
@@ -15,35 +17,34 @@ image_num = dim(3);
 % Calculate derivatives
 gx = zeros(x_max,y_max,image_num);
 gy = zeros(x_max,y_max,image_num);
-for counter = 1:image_num
-    [gx(:,:,counter),gy(:,:,counter)] = imgradientxy(images(:,:,counter));
+dx = [-1 0 1; -1 0 1; -1 0 1];
+dy = [-1 -1 -1; 0 0 0; 1 1 1];
+
+for counter= 1:image_num
+    Ix(:,:,counter) = imfilter(double(images(:,:,counter)), dx);
+    Iy(:,:,counter) = imfilter(double(images(:,:,counter)), dy);
 end
 
-% Classification parameters
-t_magnitude = 1e+06;
-k = 0.04;
 
+% Classification parameters
+k = 0.04;
+threshold = 2e+06;;
 % Classification
 corners = zeros(x_max,y_max,image_num);
-edges = zeros(x_max,y_max,image_num);
+
+cxx = imgaussfilt(Ix.^2, 2 ,'FilterSize',9);
+cyy = imgaussfilt(Iy.^2, 2 ,'FilterSize',9);
+cxy = imgaussfilt(Ix.*Iy, 2 ,'FilterSize',9);
+
+corners=zeros(x_max,y_max,image_num);
 for counter = 1:image_num
-    for x = 2:x_max-1
-        for y = 2:y_max-1
+    for x = 1:x_max
+        for y = 1:y_max
             % Create M
-            M = [0,0;0,0];
-            for i = -1:1
-                for j = -1:1
-                    M(1,1) = M(1,1) + gx(x+i,y+j,counter)^2;
-                    M(1,2) = M(1,2) + gx(x+i,y+j,counter)*gy(x+i,y+j,counter);
-                    M(2,1) = M(2,1) + gx(x+i,y+j,counter)*gy(x+i,y+j,counter);
-                    M(2,2) = M(2,2) + gy(x+i,y+j,counter)^2;
-                end
-            end
+            M = [cxx(x,y,counter), cxy(x,y,counter);cxy(x,y,counter),cyy(x,y,counter)];
             % Make decision
             R = det(M)-k*(trace(M))^2;
-            if R < -t_magnitude
-                edges(x,y,counter) = abs(R);
-            elseif R > t_magnitude
+            if (R > threshold)
                 corners(x,y,counter) = R;
             end
         end
@@ -54,17 +55,11 @@ end
 for counter = 1:image_num
     for x = 4:x_max-3
         for y = 4:y_max-3
-            % Edges
-            e_pixel = edges(x,y,counter);
-            e_pixel_is_max = 1;
             % Corners
             c_pixel = corners(x,y,counter);
             c_pixel_is_max = 1;
             for i = -3:3
                 for j = -3:3
-                    if e_pixel < edges(x+i,y+j,counter)
-                        e_pixel_is_max = 0;
-                    end
                     if c_pixel < corners(x+i,y+j,counter)
                         c_pixel_is_max = 0;
                     end
@@ -72,9 +67,6 @@ for counter = 1:image_num
             end
 
             % Suppress
-            if e_pixel_is_max == 0
-                edges(x,y,counter) = 0;
-            end
             if c_pixel_is_max == 0
                 corners(x,y,counter) = 0;
             end
@@ -83,8 +75,58 @@ for counter = 1:image_num
 end
 
 % Show results
-figure(1)
-imshow(corners(:,:,1));
+% figure(1)
+% imshow(corners(:,:,1));
+% 
+% figure(2)
+% imshow(corners(:,:,2));
 
-figure(2)
-imshow(edges(:,:,1));
+%% b correspondences between 2 images
+%images1
+
+[row, col] = find(corners(:,:,1));
+num = size(row);
+matches1=[];
+counter = 1;
+for x = 1:num(1)
+    if(row(x,1) >3 && row(x,1) <= x_max-3) && (col(x,1) > 3 && col(x,1) <=y_max -3)
+        g = images(row(x,1)-3:row(x,1)+3, col(x,1)-3:col(x,1)+3, 1);
+        f = images(:,:,2);
+        
+        NCC = normxcorr2(g,f);
+        [ypeak, xpeak] = find(NCC==max(NCC(:)));
+        matches1(counter,1) = row(x,1);
+        matches1(counter,2) = col(x,1);
+        matches1(counter,3) = ypeak;
+        matches1(counter,4) = xpeak;
+        
+        counter = counter +1;
+    end
+end
+
+[row, col] = find(corners(:,:,2));
+num = size(row);
+matches2=[];
+counter = 1;
+for x = 1:num(1)
+    if(row(x,1) >3 && row(x,1) <= x_max-3) && (col(x,1) > 3 && col(x,1) <=y_max -3)
+        g = images(row(x,1)-3:row(x,1)+3, col(x,1)-3:col(x,1)+3, 2);
+        f = images(:,:,1);
+        
+        NCC = normxcorr2(g,f);
+        [ypeak, xpeak] = find(NCC==max(NCC(:)));
+        matches2(counter,1) = row(x,1);
+        matches2(counter,2) = col(x,1);
+        matches2(counter,3) = ypeak;
+        matches2(counter,4) = xpeak;
+        counter = counter +1;
+    end
+    
+end
+
+%% homography
+dim = size(matches1);
+
+
+
+
