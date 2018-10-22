@@ -1,7 +1,7 @@
 clc;
 clear;
+
 % Load images
-f_sigma = 2;
 images = [];
 for image_num = 1:2
     image_name = sprintf('resources/DanaHallWay1/DSC_028%d.JPG',image_num);
@@ -15,8 +15,6 @@ y_max = dim(2);
 image_num = dim(3);
 
 % Calculate derivatives
-gx = zeros(x_max,y_max,image_num);
-gy = zeros(x_max,y_max,image_num);
 dx = [-1 0 1; -1 0 1; -1 0 1];
 dy = [-1 -1 -1; 0 0 0; 1 1 1];
 
@@ -28,15 +26,15 @@ end
 
 % Classification parameters
 k = 0.04;
-threshold = 2e+06;;
+threshold = 2e+06;
+f_sigma = 2;
+
 % Classification
 corners = zeros(x_max,y_max,image_num);
+cxx = imgaussfilt(Ix.^2, f_sigma,'FilterSize',9);
+cyy = imgaussfilt(Iy.^2, f_sigma,'FilterSize',9);
+cxy = imgaussfilt(Ix.*Iy, f_sigma,'FilterSize',9);
 
-cxx = imgaussfilt(Ix.^2, 2 ,'FilterSize',9);
-cyy = imgaussfilt(Iy.^2, 2 ,'FilterSize',9);
-cxy = imgaussfilt(Ix.*Iy, 2 ,'FilterSize',9);
-
-corners=zeros(x_max,y_max,image_num);
 for counter = 1:image_num
     for x = 1:x_max
         for y = 1:y_max
@@ -74,22 +72,15 @@ for counter = 1:image_num
     end
 end
 
-% Show results
-% figure(1)
-% imshow(corners(:,:,1));
-% 
-% figure(2)
-% imshow(corners(:,:,2));
-
 %% b correspondences between 2 images
-%images1
 
-[row, col] = find(corners(:,:,1));
+% Image 1
+[row, col] = find(corners(:,:,1) > 0);
 num = size(row);
 matches1=[];
 counter = 1;
 for x = 1:num(1)
-    if(row(x,1) >3 && row(x,1) <= x_max-3) && (col(x,1) > 3 && col(x,1) <=y_max -3)
+    if(row(x,1) > 3 && row(x,1) <= x_max-3) && (col(x,1) > 3 && col(x,1) <= y_max-3)
         g = images(row(x,1)-3:row(x,1)+3, col(x,1)-3:col(x,1)+3, 1);
         f = images(:,:,2);
         
@@ -97,8 +88,8 @@ for x = 1:num(1)
         [ypeak, xpeak] = find(NCC==max(NCC(:)));
         matches1(counter,1) = row(x,1);
         matches1(counter,2) = col(x,1);
-        matches1(counter,3) = ypeak;
-        matches1(counter,4) = xpeak;
+        matches1(counter,3) = ypeak-3;
+        matches1(counter,4) = xpeak-3;
         
         counter = counter +1;
     end
@@ -117,16 +108,45 @@ for x = 1:num(1)
         [ypeak, xpeak] = find(NCC==max(NCC(:)));
         matches2(counter,1) = row(x,1);
         matches2(counter,2) = col(x,1);
-        matches2(counter,3) = ypeak;
-        matches2(counter,4) = xpeak;
+        matches2(counter,3) = ypeak-3;
+        matches2(counter,4) = xpeak-3;
         counter = counter +1;
     end
     
 end
 
+% Find real correspondences
+true_matches = [];
+tolerence = 2;
+total_matches1 = size(matches1);
+for iter1 = 1:total_matches1(1)
+   image1_x = matches1(iter1,1);
+   image1_y = matches1(iter1,2);
+   image2_x = matches1(iter1,3);
+   image2_y = matches1(iter1,4);
+   
+   total_matches2 = size(matches2);
+   for iter2 = 1:total_matches2(1)
+       if abs(matches2(iter2,1)-matches1(iter1,3)) < tolerence
+           if abs(matches2(iter2,2)-matches1(iter1,4)) < tolerence
+               if abs(matches2(iter2,3)-matches1(iter1,1)) < tolerence
+                   if abs(matches2(iter2,4)-matches1(iter1,2)) < tolerence
+                       true_matches = [true_matches; image1_x,image1_y,image2_x,image2_y];
+                   end
+               end
+           end
+       end
+   end
+end
+
+
 %% homography
 dim = size(matches1);
 
-
+% Show results
+figure(1)
+scatter(true_matches(:,1),true_matches(:,2))
+figure(2)
+scatter(true_matches(:,3),true_matches(:,4))
 
 
