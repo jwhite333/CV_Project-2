@@ -3,7 +3,7 @@ clear;
 
 % Load images
 images = [];
-for image_num = 1:2
+for image_num = 2:3
     image_name = sprintf('resources/DanaHallWay1/DSC_028%d.JPG',image_num);
     temp = im2double(imread(image_name));
     images = cat(3,images,rgb2gray(temp));
@@ -219,7 +219,8 @@ hom = H*[1;1;1];
 width_diff = 1-hom(1)/hom(3);
 height_diff = 1-hom(2)/hom(3);
 mosaic_width = ceil(dim(1)+abs(width_diff));
-mosaic_height = ceil(2*dim(2)-2*height_diff);
+%mosaic_height = ceil(2*dim(2)-2*height_diff);
+mosaic_height = ceil(dim(2)+abs(height_diff));
 mosaic_img = zeros(mosaic_width,mosaic_height);
 
 % Place right image (image 2)
