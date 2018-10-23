@@ -1,10 +1,31 @@
 clc;
 clear;
 
+% Initilization
+% 1 = 'resources/DanaHallWay1/DSC_028%d.JPG';
+% 2 = 'resources/DanaHallWay2/DSC_028%d.JPG';
+% 3 = 'resources/DanaOffice/DSC_03%d.JPG';
+SourcePath = 2;
+
+% for resources/DanaOffice/DSC_028%d.JPG
+% 1 = DSC_0308 and DSC_0309
+% 2 = DSC_0310 and DSC_0311
+% 3 = DSC_0311 and DSC_0312
+% 4 = DSC_0313 and DSC_0314
+% 5 = DSC_0315 and DSC_0316  
+% 6 = DSC_0316 and DSC_0317
+% for other two folder can be anything
+option = 1;
+
+
+[path, x, y] = sourceSelect(SourcePath, option);
+
+
 % Load images
 images = [];
-for image_num = 2:3
-    image_name = sprintf('resources/DanaHallWay1/DSC_028%d.JPG',image_num);
+
+for image_num = x:y
+    image_name = sprintf(path,image_num);
     temp = im2double(imread(image_name));
     images = cat(3,images,rgb2gray(temp));
 end
