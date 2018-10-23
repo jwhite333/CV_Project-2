@@ -5,7 +5,7 @@ clear;
 % 1 = 'resources/DanaHallWay1/DSC_028%d.JPG';
 % 2 = 'resources/DanaHallWay2/DSC_028%d.JPG';
 % 3 = 'resources/DanaOffice/DSC_03%d.JPG';
-SourcePath = 2;
+SourcePath = 3;
 
 % for resources/DanaOffice/DSC_028%d.JPG
 % 1 = DSC_0308 and DSC_0309
@@ -15,10 +15,10 @@ SourcePath = 2;
 % 5 = DSC_0315 and DSC_0316  
 % 6 = DSC_0316 and DSC_0317
 % for other two folder can be anything
-option = 1;
+option = 6;
 
 
-[path, x, y] = sourceSelect(SourcePath, option);
+[path, x, y, tolerence, accuracyTorr] = sourceSelect(SourcePath, option);
 
 
 % Load images
@@ -49,7 +49,6 @@ end
 % Classification parameters
 k = 0.04;           % Value for Harris corner detector
 f_sigma = 2;        % Gaussian filtering variance
-tolerence = 1;      % Homography pixel error tolerence
 
 % Classification
 corners = zeros(x_max,y_max,image_num);
@@ -62,7 +61,7 @@ for counter = 1:image_num
         for y = 1:y_max
             % Create M
             M = [cxx(x,y,counter), cxy(x,y,counter);cxy(x,y,counter),cyy(x,y,counter)];
-            % Make decision
+            % R response
             R(x,y,counter) = det(M)-k*(trace(M))^2;
             
         end
@@ -94,13 +93,13 @@ figure(1)
 [r,c] = find(corners(:,:,1));
 imshow(images(:,:,1));
 hold on
-plot(c,r,"yd");
+plot(c,r,"rd");
 
 figure(2)
 [r,c] = find(corners(:,:,2));
 imshow(images(:,:,2));
 hold on
-plot(c,r,"yd");
+plot(c,r,"rd");
 
 %% b Correspondences between 2 images
 
@@ -118,8 +117,8 @@ for x = 1:num(1)
         [ypeak, xpeak] = find(NCC==max(NCC(:)));
         matches1(counter,1) = row(x,1);
         matches1(counter,2) = col(x,1);
-        matches1(counter,3) = ypeak-3;
-        matches1(counter,4) = xpeak-3;
+        matches1(counter,3) = ypeak(1,1)-3;
+        matches1(counter,4) = xpeak(1,1)-3;
         
         counter = counter +1;
     end
@@ -139,8 +138,8 @@ for x = 1:num(1)
         [ypeak, xpeak] = find(NCC==max(NCC(:)));
         matches2(counter,1) = row(x,1);
         matches2(counter,2) = col(x,1);
-        matches2(counter,3) = ypeak-3;
-        matches2(counter,4) = xpeak-3;
+        matches2(counter,3) = ypeak(1,1)-3;
+        matches2(counter,4) = xpeak(1,1)-3;
         counter = counter +1;
     end
     
@@ -183,7 +182,7 @@ end
 %[H, inliner] = RANSAC_homogrpahy(true_matches);
 
 accuracy = 0.0;
-while accuracy < 0.9
+while accuracy < accuracyTorr
     % Choose 4 points at random
     samples = randi([1,t(1)],1,4);
     A = zeros(8,9);

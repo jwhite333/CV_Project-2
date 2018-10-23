@@ -1,5 +1,7 @@
-function [path, x, y] = sourceSelect(SourcePath, option)
+function [path, x, y, tolerence, accuracyTorr] = sourceSelect(SourcePath, option)
 % Source folder
+tolerence = 1;
+accuracyTorr = 0.9;
 switch SourcePath
     case 1
         path = 'resources/DanaHallWay1/DSC_028%d.JPG';
@@ -17,6 +19,8 @@ elseif SourcePath == 2
     x = 5;
     y = 6;
 elseif SourcePath == 3
+    tolerence =3;
+    accuracyTorr = 0.8;
     switch option
         case 1
             path = 'resources/DanaOffice/DSC_030%d.JPG';
@@ -32,9 +36,13 @@ elseif SourcePath == 3
             x = 3;
             y = 4;
         case 5
+            tolerence = 2;
+            accuracyTorr = 0.89;
             x = 5;
             y = 6;
         case 6
+            tolerence = 5;
+            accuracyTorr = 0.50;
             x = 6;
             y = 7;
     end
