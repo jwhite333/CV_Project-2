@@ -26,8 +26,9 @@ end
 
 
 % Classification parameters
-k = 0.04;
-f_sigma = 2;
+k = 0.04;           % Value for Harris corner detector
+f_sigma = 2;        % Gaussian filtering variance
+tolerence = 1;      % Homography pixel error tolerence
 
 % Classification
 corners = zeros(x_max,y_max,image_num);
@@ -53,11 +54,10 @@ for counter = 1:image_num
 end
 
 
-% Do non-max suppression on edges and corners using 7x7 filter
+% Do non-max suppression on corners
 for counter = 1:image_num
     for x = 2:x_max-1
         for y = 2:y_max-1
-            % Corners
             if R(x,y,counter)>maxR(1,counter) && R(x,y,counter)>R(x-1,y-1,counter) ...
                 && R(x,y,counter)>R(x-1,y,counter) && R(x,y,counter)>R(x-1,y+1,counter) ...
                 && R(x,y,counter)>R(x,y-1,counter) && R(x,y,counter)>R(x,y+1,counter) ...
@@ -80,7 +80,8 @@ figure(2)
 imshow(images(:,:,2));
 hold on
 plot(c,r,"yd");
-%% b correspondences between 2 images
+
+%% b Correspondences between 2 images
 
 % Image 1
 [row, col] = find(corners(:,:,1) > 0);
@@ -103,6 +104,7 @@ for x = 1:num(1)
     end
 end
 
+% Image 2
 [row, col] = find(corners(:,:,2));
 num = size(row);
 matches2=[];
@@ -123,9 +125,8 @@ for x = 1:num(1)
     
 end
 
-% Find real correspondences
+% Remove false matches
 true_matches = [];
-tolerence = 10;
 total_matches1 = size(matches1);
 for iter1 = 1:total_matches1(1)
     image1_x = matches1(iter1,1);
@@ -147,12 +148,7 @@ for iter1 = 1:total_matches1(1)
     end
 end
 
-%Show results
-% figure(3)
-% scatter(true_matches(:,2),true_matches(:,1))
-% figure(4)
-% scatter(true_matches(:,4),true_matches(:,3))
-
+% Display correspondence pairs on images
 figure(5)
 imshowpair(images(:,:,1),images(:,:,2),'montage');
 t=size(true_matches);
@@ -162,25 +158,96 @@ for index = 1:t(1)
         [true_matches(index, 1) true_matches(index,3)]);
 end
 
-%% homography
-[H, inliner] = RANSAC_homogrpahy(true_matches);
+%% Homography using RANSAC
+%[H, inliner] = RANSAC_homogrpahy(true_matches);
 
-%least-squares homgraphy
-lengthH = length(inliner);
-A =[];
-for i=1:lengthH
-    A =[A; 
-        inliner(i,1) inliner(i,2) 1 0 0 0 -inliner(i,1)*inliner(i,3) -inliner(i,2)*inliner(i,3) -inliner(i,3);
-        0 0 0 inliner(i,1) inliner(i,2) 1 -inliner(i,1)*inliner(i,4) -inliner(i,2)*inliner(i,4) -inliner(i,4)];      
+accuracy = 0.0;
+while accuracy < 0.9
+    % Choose 4 points at random
+    samples = randi([1,t(1)],1,4);
+    A = zeros(8,9);
+    
+    % Create the A matrix
+    for iter = 0:3
+        x1 = true_matches(samples(iter+1),1);
+        y1 = true_matches(samples(iter+1),2);
+        x1p = true_matches(samples(iter+1),3);
+        y1p = true_matches(samples(iter+1),4);
+        A(2*iter+1,:) = [x1,y1,1,0,0,0,-x1*x1p,-y1*x1p,-x1p];
+        A(2*iter+2,:) = [0,0,0,x1,y1,1,-x1*y1p,-y1*y1p,-y1p];
+    end
+    
+    % Get SVD
+    [U,~,~] = svd(A.'*A);
+    h = U(:,9);
+    
+    % Find percentage of points that agree with this homography
+    correct_homs = 0;
+    inliers = [];
+    H = [h(1),h(2),h(3);h(4),h(5),h(6);h(7),h(8),h(9)];
+    for iter = 1:t(1)
+        x = true_matches(iter,1);
+        y = true_matches(iter,2);
+        guess = H*[x;y;1];
+        x1p_guess = guess(1)/guess(3);
+        y1p_guess = guess(2)/guess(3);
+        if abs(x1p_guess-true_matches(iter,3)) < tolerence && abs(y1p_guess-true_matches(iter,4)) < tolerence
+            
+            % Set the "inliers" to be the points that agree with the
+            % homography
+            inliers = [inliers; true_matches(iter,:)];
+            correct_homs = correct_homs+1;
+        end
+    end
+    accuracy = correct_homs/t(1);
 end
 
-[U,S,V] = svd(A.'*A);
-%%
 figure(6)
 imshowpair(images(:,:,1),images(:,:,2),'montage');
-t=size(inliner);
-for index = 1:t(1) 
+t = size(inliers);
+for index = 1:t(1)
     hold on
-    plot([inliner(index, 1) inliner(index,3)+512], ...
-        [inliner(index, 2) inliner(index,4)]);
+    plot([inliers(index, 2) inliers(index,4)+512], ...
+        [inliers(index, 1) inliers(index,3)]);
 end
+
+
+%% Combine images 1+2
+
+% Find dimentions of mosaic
+hom = H*[1;1;1];
+width_diff = 1-hom(1)/hom(3);
+height_diff = 1-hom(2)/hom(3);
+mosaic_width = ceil(dim(1)+abs(width_diff));
+mosaic_height = ceil(2*dim(2)-2*height_diff);
+mosaic_img = zeros(mosaic_width,mosaic_height);
+
+% Place right image (image 2)
+x_offset = 1;
+if width_diff > 0
+    x_offset = ceil(width_diff);
+end
+mosaic_img(x_offset+1:x_offset+dim(1),mosaic_height-dim(2)+1:mosaic_height) = images(:,:,2);
+
+x0 = x_offset+1;
+y0 = mosaic_height-dim(2)+1;
+
+% Add in image 1
+for x1 = 1:mosaic_width
+    for y1 = 1:mosaic_height
+        inv_hom = H\[x1-x0;y1-y0;1];
+        x = round(inv_hom(1)/inv_hom(3));
+        y = round(inv_hom(2)/inv_hom(3));
+        if x >= 1 && x <= dim(1) && y >= 1 && y <= dim(2)
+            if mosaic_img(x1,y1) ~= 0
+                mosaic_img(x1,y1) = (mosaic_img(x1,y1)+images(x,y,1))/2;
+            else
+                mosaic_img(x1,y1) = images(x,y,1);
+            end
+        end
+    end
+end
+
+% Show mosaic
+figure(7)
+imshow(mosaic_img);
